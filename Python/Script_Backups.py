@@ -55,15 +55,15 @@ def check_new_backups(path):
             command = "find " + subdir + " -type f -mtime -1"
             r = subprocess.check_output(command, shell=True, universal_newlines=True).strip()
             if r:
-                #write_log("INFO: Existen nuevos backups en " + directory)
+                #write_log("INFO: Existen nuevos backups en " + subdir)
                 with_backups.append(subdir)
             else:
-                #write_log("ERROR: No se tomaron backups en " + directory)
+                #rite_log("ERROR: No se tomaron backups en " + subdir)
                 no_backups.append(subdir)
         # Devolver listas con los directorios que tienen/no tienen backups
         return bool(with_backups), with_backups, no_backups
     except subprocess.CalledProcessError as e:
-        #write_log("ERROR: Fallo en la ejecución del comando: " + str(e))
+        write_log("ERROR: Falló en la ejecución del comando: " + str(e))
         return False, [], []
 #----------------------------------------------------------------------- 
 def check_new_backups_Instancia(path):
@@ -71,11 +71,11 @@ def check_new_backups_Instancia(path):
     command = "find " + path + " -type f -mtime -1 -exec ls -lh {} \\;"
     r = subprocess.check_output(command, shell=True, universal_newlines=True)
     if r.strip():
-        write_log("INFO: Existen nuevos backups")
+        #write_log("INFO: Existen nuevos backups")
         flag = True
         return flag,r
     else:
-        write_log("ERROR: No se tomaron backups")
+        #write_log("ERROR: No se tomaron backups")
         flag = False
         return flag,r
 #-----------------------------------------------------------------------    
@@ -85,7 +85,6 @@ def check_size(subdir):
 
     command = "find " + subdir + "/*" + " -type f -mtime -1 -exec du -sb {} \\;"
     res = subprocess.check_output(command, shell=True, universal_newlines=True)
-
     for line in res.splitlines():
         size, file = line.split("\t")
         value = int(size)
@@ -96,14 +95,15 @@ def check_size(subdir):
             bk_failed.append(archivo)
 
     if bk_failed:  # Si hay archivos con tamaño incorrecto
-        write_log("ALERT: El tamaño de algunos backups no es consistente")
+        #write_log("ALERT: El tamaño de algunos backups no es consistente")
         print("El tamaño de algunos backups no es consistente")
     else:
-        write_log("INFO: Todos los backups tienen el tamaño correcto")
+        #write_log("INFO: Todos los backups tienen el tamaño correcto")
         print("Todos los backups tienen el tamaño correcto")
 
     archivo = "\n".join(bk_failed)  # Lista de archivos incorrectos
     return flag2, archivo
+
 
 #-----------------------MAIN-------------------------------------
 #----------------------------------------------------------------
@@ -124,37 +124,46 @@ if flag:  # ¿Existen nuevos backups?
             err_backup.append(archivo)
 
     if not err_backup and not no_backup: # pregunta ¿las listas err y no_backup estan vacios?
-        contenido_schema = "Backups Correctos"  # Todos los backups son correctos, por que no hay errores y no hay paths que no tengan backups
+        contenido_schema = "Backups de Schema Correctos"  # Todos los backups son correctos, por que no hay errores y no hay paths que no tengan backups
     elif not err_backup: #¿la lista err backup está vacio? 
-        contenido_schema = "No se tomaron backups en:\n" + "\n".join(map(str, no_backup))  # Si, si err_backup está vacio quiere decir que hay directorio donde no se tomaron backups
+        contenido_schema = "No se tomaron backups de schema en:\n" + "\n".join(map(str, no_backup))  # Si, si err_backup está vacio quiere decir que hay directorio donde no se tomaron backups
+        write_log("ERROR: No se tomaron backups de schema en:\n" + "\n".join(map(str, no_backup)))
     elif not no_backup: #¿la lista no_backup está vació?
-        contenido_schema = "El tamaño de los backups no es correcto en:\n" + "\n".join(map(str, err_backup))  # Si, si no_backuu está vacio quiere decir que existen backups nuevos pero err_backup no esta vacio, entonces hay backups con errores.
+        contenido_schema = "El tamaño del backup de schema no es correcto en:\n" + "\n".join(map(str, err_backup))  # Si, si no_backuu está vacio quiere decir que existen backups nuevos pero err_backup no esta vacio, entonces hay backups con errores.
+        write_log("ALERT: El tamaño del backup de schema no es correcto en:\n" + "\n".join(map(str, err_backup)))
     else:       #hay los dos problemas a la vez, backups de tamaño incorrecto y no hay backups recientes
         contenido_schema = (
-            "El tamaño de los backups no es correcto en:\n" + "\n".join(map(str, err_backup)) + "\n\n" +
-            "No se tomaron backups en:\n" + "\n".join(map(str, no_backup))
+            "El tamaño del backup de schema no es correcto en:\n" + "\n".join(map(str, err_backup)) + "\n\n" +
+            "No se tomaron backups de schema en:\n" + "\n".join(map(str, no_backup))
         )  # asignamos el contenido con al información de ambos problemas
+        write_log(
+            "ALERT: El tamaño del backup de schema no es correcto en:\n" + "\n".join(map(str, err_backup)) + "\n\n" +
+            "ERROR: No se tomaron backups de schema en:\n" + "\n".join(map(str, no_backup))
+        )
     #prueba para validar que se estáa imprimiendo
     print("Contenido del correo:\n", contenido_schema)
-    #send_mail(contenido_schema)
 else:
-    contenido_schema = "No se tomaron backups en:\n" + "\n".join(map(str, no_backup))  # No se tomaron backups
+    contenido_schema = "No se tomaron backups de schema en:\n" + "\n".join(map(str, no_backup))  # No se tomaron backups
+    write_log("ERROR: No se tomaron backups de schema en:\n" + "\n".join(map(str, no_backup)))
     print("Contenido del correo:\n", contenido_schema)
-    #send_mail(contenido_schema)
+
 
 #BACKUP INSTANCIA------------------------------------------------
 flag,r= check_new_backups_Instancia(path_instancia)
 if flag:    #la bandera de nuevo backups indica que existen nuevos backups?
     flag2,archivo = check_size(path_instancia)    #si?, entonces obtengo el valor del flag y los archivos para validar su tamaño
     if flag2: #la bandera del tamaño de los backups es verdadera?
-        contenido_instancia = "Backups Correctos"
-        print ("Backups Correctos")    
+        contenido_instancia = "Backups de Instancia Correctos"
+        write_log("INFO: Backups de Instancia Correctos")
+        print ("Backups de Instancia Correctos")    
     else:   #si no es, guarda en una variable los archivos que no cumplen con el tamaño y los manda por correo.
-        contenido_instancia = "El tamaño de los backups no es correcto" + "\n" + archivo
+        contenido_instancia = "El tamaño del backup de instancia no es correcto" + "\n" + archivo
+        write_log("ALERT: El tamaño de los backups de instancia no es correcto" + "\n" + archivo)
         #send_mail(contenido)  
 else:
-    contenido_instancia = "No se tomaron backups en:\n" + path_instancia
+    contenido_instancia = "No se tomaron backups de instancia en:\n" + path_instancia
+    write_log("ERROR: No se tomaron backups de instancia en:\n" + path_instancia)
     #send_mail(contenido)
-send_mail("BACKUPS DE SHCEMA:\n" + contenido_schema + "BACKUPS DE INSTANCIA:\n" + "\t\t" +contenido_instancia)
+send_mail("BACKUPS DE SHCEMA \n" + contenido_schema + "\n\n" +"BACKUPS DE INSTANCIA \n" +contenido_instancia)
 
 write_log("\t" + "...ejecución del script finalizada")
